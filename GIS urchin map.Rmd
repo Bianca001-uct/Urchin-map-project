@@ -1,0 +1,96 @@
+---
+title: "Urchin Species Distribution Map"
+author: "Bianca"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# Set CRAN mirror to avoid errors
+options(repos = c(CRAN = "https://cloud.r-project.org/"))  
+```
+
+## Load Libraries
+```{r}
+library(tidyverse)  # Includes ggplot2, dplyr, readr
+library(ggmap) # For maps
+library(ggplot2)
+library(ggspatial)
+library(sf)
+library(rnaturalearth)
+library(rnaturalearthdata)
+```
+
+## Load Data
+```{r}
+# Read CSV files
+parechinus_data <- read_csv("Parechinus angulosus.csv")
+tripneustes_data <- read_csv("Tripneustes gratilla.csv")
+
+# Check column names
+colnames(parechinus_data)
+colnames(tripneustes_data)
+```
+
+## Prepare Data
+```{r}
+# Select relevant columns and remove missing values
+parechinus_clean <- parechinus_data %>%
+  select(longitude, latitude) %>%
+  drop_na()
+
+tripneustes_clean <- tripneustes_data %>%
+  select(longitude, latitude) %>%
+  drop_na()
+```
+
+## Plot Map
+```{r}
+# Add species column to differentiate them
+parechinus_clean$species <- "Parechinus angulosus"
+tripneustes_clean$species <- "Tripneustes gratilla"
+
+# Combine both datasets
+urchins <- bind_rows(parechinus_clean, tripneustes_clean)
+
+# Load the world map with high-resolution
+world <- ne_countries(scale = "medium", returnclass = "sf")
+
+library(ggplot2)
+library(sf)
+library(ggspatial)
+
+# Load South African provinces shapefile
+sa_provinces <- st_read("path_to_provinces_shapefile.shp")  
+
+# Get province centroids for label placement
+province_labels <- st_centroid(sa_provinces)
+
+# Base Map
+ggplot() +
+  geom_sf(data = sa_provinces, fill = "gray90", color = "black") +  # Map with province borders
+  geom_point(data = parechinus_clean, aes(x = longitude, y = latitude, color = "Parechinus angulosus"), alpha = 0.7, size = 2) +
+  geom_point(data = tripneustes_clean, aes(x = longitude, y = latitude, color = "Tripneustes gratilla"), alpha = 0.7, size = 2) +
+  geom_text(data = province_labels, aes(x = st_coordinates(geometry)[,1], y = st_coordinates(geometry)[,2], label = PROVINCE_NAME), size = 4, color = "black", fontface = "bold") +
+  scale_color_manual(values = c("Parechinus angulosus" = "blue", "Tripneustes gratilla" = "red")) +
+  annotation_scale(location = "br", width_hint = 0.3) +
+  annotation_north_arrow(location = "tl", which_north = "true", style = north_arrow_fancy_orienteering) +
+  labs(title = "Urchin Species Distribution in South Africa",
+       x = "Longitude",
+       y = "Latitude",
+       color = "Urchin Species") +
+  theme_minimal()
+
+
+library(leaflet)
+
+leaflet() %>%
+  addProviderTiles("Esri.WorldImagery") %>%  # Satellite Map
+  addCircleMarkers(data = parechinus_clean, ~longitude, ~latitude, color = "blue", label = "Parechinus angulosus") %>%
+  addCircleMarkers(data = tripneustes_clean, ~longitude, ~latitude, color = "red", label = "Tripneustes gratilla") %>%
+  addLegend("bottomright", colors = c("blue", "red"), labels = c("Parechinus angulosus", "Tripneustes gratilla"))
+
+
+# Display the map
+print(map)
+```
